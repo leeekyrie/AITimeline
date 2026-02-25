@@ -30,8 +30,8 @@ class NotepadManager {
         this.MIN_WIDTH = 240;
         this.MIN_HEIGHT = 280;
 
-        // 位置 & 大小
-        this.position = { x: null, y: null };
+        // 位置（右下角锚定：距视口右边/底部的距离）& 大小
+        this.position = { right: null, bottom: null };
         this.size = { width: this.DEFAULT_WIDTH, height: this.DEFAULT_HEIGHT };
 
         // 拖动状态
@@ -47,6 +47,7 @@ class NotepadManager {
         this._onMouseUp = null;
         this._onFocusCheck = null;
         this._onStorageChange = null;
+        this._onWindowResize = null;
         this._isSaving = false;
 
         this.loadState();
@@ -229,6 +230,12 @@ class NotepadManager {
             }
         };
         chrome.storage.onChanged.addListener(this._onStorageChange);
+
+        this._onWindowResize = () => {
+            if (!this.isOpen || !this.panel) return;
+            this.applyState();
+        };
+        window.addEventListener('resize', this._onWindowResize);
     }
 
     // ─── 单条模式 ─────────────────────────────────────────────────────────────
@@ -491,7 +498,16 @@ class NotepadManager {
             chrome.storage.local.get(this.STATE_KEY, (result) => {
                 const state = result[this.STATE_KEY];
                 if (state) {
-                    if (state.position && state.position.x !== null) this.position = state.position;
+                    if (state.position) {
+                        if (state.position.right !== undefined) {
+                            this.position = state.position;
+                        } else if (state.position.x !== null && state.position.x !== undefined) {
+                            this.position = {
+                                right: window.innerWidth - state.position.x - (state.size?.width || this.DEFAULT_WIDTH),
+                                bottom: window.innerHeight - state.position.y - (state.size?.height || this.DEFAULT_HEIGHT)
+                            };
+                        }
+                    }
                     if (state.size) this.size = state.size;
                 }
             });
@@ -576,7 +592,7 @@ class NotepadManager {
         this.panel.style.top    = newTop    + 'px';
 
         this.size     = { width: newWidth, height: newHeight };
-        this.position = { x: newLeft, y: newTop };
+        this.position = { right: window.innerWidth - newLeft - newWidth, bottom: window.innerHeight - newTop - newHeight };
     }
 
     onMouseUp() {
@@ -592,22 +608,34 @@ class NotepadManager {
     // ─── 位置（与 runner 完全一致）────────────────────────────────────────────
 
     setPosition(x, y) {
-        const maxX = window.innerWidth  - this.panel.offsetWidth;
-        const maxY = window.innerHeight - this.panel.offsetHeight;
+        const w = this.panel.offsetWidth;
+        const h = this.panel.offsetHeight;
+        const maxX = window.innerWidth  - w;
+        const maxY = window.innerHeight - h;
         x = Math.max(0, Math.min(maxX, x));
         y = Math.max(0, Math.min(maxY, y));
 
         this.panel.style.left = x + 'px';
         this.panel.style.top  = y + 'px';
-        this.position = { x, y };
+        this.position = { right: window.innerWidth - x - w, bottom: window.innerHeight - y - h };
+    }
+
+    _toLeftTop() {
+        const x = window.innerWidth - this.position.right - this.size.width;
+        const y = window.innerHeight - this.position.bottom - this.size.height;
+        return {
+            x: Math.max(0, Math.min(window.innerWidth - this.size.width, x)),
+            y: Math.max(0, Math.min(window.innerHeight - this.size.height, y))
+        };
     }
 
     applyState() {
         if (!this.panel) return;
+        const { x, y } = this._toLeftTop();
         this.panel.style.width  = this.size.width  + 'px';
         this.panel.style.height = this.size.height + 'px';
-        this.panel.style.left   = this.position.x  + 'px';
-        this.panel.style.top    = this.position.y  + 'px';
+        this.panel.style.left   = x + 'px';
+        this.panel.style.top    = y + 'px';
     }
 
     // ─── Open / Close / Toggle ────────────────────────────────────────────────
@@ -616,13 +644,8 @@ class NotepadManager {
         if (this.isOpen) return;
         this.isOpen = true;
 
-        if (this.position.x === null) {
+        if (this.position.right === null) {
             this.position = this._calcDefaultPosition();
-        } else {
-            const maxX = window.innerWidth - this.size.width;
-            const maxY = window.innerHeight - this.size.height;
-            this.position.x = Math.max(0, Math.min(maxX, this.position.x));
-            this.position.y = Math.max(0, Math.min(maxY, this.position.y));
         }
 
         this.applyState();
@@ -648,25 +671,25 @@ class NotepadManager {
         const W = this.size.width;
         const H = this.size.height;
 
-        let x, y;
+        let right, bottom;
         if (wrapper) {
             const wRect = wrapper.getBoundingClientRect();
-            x = wRect.left - W - 8;
+            right = (window.innerWidth - wRect.left) + 8;
             const notepadBtn = document.querySelector('.ait-notepad-btn');
             if (notepadBtn) {
                 const btnRect = notepadBtn.getBoundingClientRect();
-                y = btnRect.bottom - H;
+                bottom = window.innerHeight - btnRect.bottom;
             } else {
-                y = wRect.bottom - H;
+                bottom = window.innerHeight - wRect.bottom;
             }
         } else {
-            x = window.innerWidth - W - 20;
-            y = 100;
+            right = 20;
+            bottom = window.innerHeight - H - 100;
         }
 
-        x = Math.max(0, Math.min(window.innerWidth  - W, x));
-        y = Math.max(0, Math.min(window.innerHeight - H, y));
-        return { x, y };
+        right  = Math.max(0, right);
+        bottom = Math.max(0, bottom);
+        return { right, bottom };
     }
 
     close() {
@@ -710,6 +733,10 @@ class NotepadManager {
         if (this._onStorageChange) {
             chrome.storage.onChanged.removeListener(this._onStorageChange);
             this._onStorageChange = null;
+        }
+        if (this._onWindowResize) {
+            window.removeEventListener('resize', this._onWindowResize);
+            this._onWindowResize = null;
         }
         clearTimeout(this.saveTimeout);
         this._flushCurrentNote();
