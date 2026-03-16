@@ -214,6 +214,24 @@
     margin-bottom: 8px;
 }
 
+.archive-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.archive-actions .sync-btn {
+    width: 100%;
+    justify-content: center;
+}
+
+.archive-subhint {
+    margin-top: 10px;
+    color: #6b7280;
+    font-size: 12px;
+    line-height: 1.5;
+}
+
 .gdrive-actions .sync-btn {
     flex: 1;
     justify-content: center;
@@ -267,4 +285,10 @@
 .sync-status.error {
     background: #fee2e2;
     color: #991b1b;
+}
+
+@media (max-width: 760px) {
+    .gdrive-actions {
+        flex-direction: column;
+    }
 }

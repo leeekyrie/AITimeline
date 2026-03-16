@@ -17,9 +17,13 @@
     "unlimitedStorage",
     "identity"
   ],
+
+  "host_permissions": [
+    "<all_urls>"
+  ],
   
   "oauth2": {
-    "client_id": "945798922226-gdjj6v37j5fueacci9253u0j1iasiht2.apps.googleusercontent.com",
+    "client_id": "527365716055-n5nnsvfkh5ksquolebk9a7n3o4v4q83f.apps.googleusercontent.com",
     "scopes": [
       "https://www.googleapis.com/auth/drive.file"
     ]
@@ -30,6 +34,16 @@
   },
   
   "content_scripts": [
+    {
+      "matches": [
+        "https://www.doubao.com/*",
+        "https://kimi.moonshot.cn/*",
+        "https://yuanbao.tencent.com/*"
+      ],
+      "js": ["js/archive/network-interceptor-main.js"],
+      "run_at": "document_start",
+      "world": "MAIN"
+    },
     {
       "matches": [
         "<all_urls>"
@@ -100,9 +114,11 @@
         "js/runner/components/runner-panel.js",
         "js/runner/components/floating-runner.js",
         "js/runner/index.js",
+        "js/archive/storage.js",
+        "js/archive/manager.js",
         "js/panelModal/tabs/runner/index.js",
+        "js/panelModal/tabs/archive/index.js",
         "js/panelModal/tabs/dataSync/index.js",
-        "js/panelModal/tabs/about/index.js",
         "js/panelModal/tab-registry.js",
         "js/panelModal/index.js",
         "js/smartInputBox/constants.js",
@@ -167,8 +183,8 @@
         "js/runner/components/runner-panel.css",
         "js/runner/components/floating-runner.css",
         "js/panelModal/tabs/runner/styles.css",
+        "js/panelModal/tabs/archive/styles.css",
         "js/panelModal/tabs/dataSync/styles.css",
-        "js/panelModal/tabs/about/styles.css",
         "js/timeline/star-input-modal/star-input-modal.css",
         "js/timeline/notepad/notepad.css",
         "js/timeline/timeline.css",

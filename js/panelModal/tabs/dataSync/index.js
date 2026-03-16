@@ -32,6 +32,14 @@ class DataSyncTab extends BaseTab {
             }
         };
     }
+
+    log(...args) {
+        console.log('[DataSyncTab]', ...args);
+    }
+
+    logError(...args) {
+        console.error('[DataSyncTab]', ...args);
+    }
     
     /**
      * 渲染设置内容
@@ -39,8 +47,36 @@ class DataSyncTab extends BaseTab {
     render() {
         const container = document.createElement('div');
         container.className = 'data-sync-tab';
-        
         container.innerHTML = `
+            <div class="sync-section archive-section">
+                <div class="sync-title">
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 6px; flex-shrink: 0;">
+                        <path d="M21 8v13H3V8"/>
+                        <path d="M1 3h22v5H1z"/>
+                        <path d="M10 12h4"/>
+                    </svg>
+                    会话归档
+                </div>
+                <div class="sync-hint">
+                    导出入口已迁移到“会话归档” Tab。这里保留 Google Drive 归档导入，用于把已归档的 md 和资源重新导入插件本地。
+                </div>
+                <div class="archive-actions">
+                    <button class="sync-btn gdrive-download-btn" id="archive-import-btn">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                            <path d="M12 21V9"/>
+                            <path d="M17 14l-5-5-5 5"/>
+                            <path d="M5 3h14"/>
+                        </svg>
+                        从 Google Drive 导入归档
+                    </button>
+                </div>
+                <div class="archive-subhint">
+                    导出/导入完成后会有结果提示；失败时会显示具体报错内容。
+                </div>
+            </div>
+
+            <div class="sync-divider"></div>
+
             <div class="sync-section gdrive-section">
                 <div class="sync-title">
                     <svg viewBox="0 0 87.3 78" width="18" height="16" style="margin-right: 6px; flex-shrink: 0;">
@@ -153,12 +189,16 @@ class DataSyncTab extends BaseTab {
         // --- Google Drive 云同步 ---
         const uploadBtn = document.getElementById('gdrive-upload-btn');
         const downloadBtn = document.getElementById('gdrive-download-btn');
+        const archiveImportBtn = document.getElementById('archive-import-btn');
         
         if (uploadBtn) {
             this.addEventListener(uploadBtn, 'click', () => this.handleGDriveUpload());
         }
         if (downloadBtn) {
             this.addEventListener(downloadBtn, 'click', () => this.handleGDriveDownload());
+        }
+        if (archiveImportBtn) {
+            this.addEventListener(archiveImportBtn, 'click', () => this.handleArchiveImport());
         }
         
         // --- 本地导入导出 ---
@@ -174,6 +214,46 @@ class DataSyncTab extends BaseTab {
         }
         if (fileInput) {
             this.addEventListener(fileInput, 'change', (e) => this.handleImport(e));
+        }
+    }
+
+    async handleArchiveImport() {
+        const button = document.getElementById('archive-import-btn');
+        this.log('handleArchiveImport:start');
+        if (button) {
+            button.disabled = true;
+            button.textContent = '归档导入中...';
+        }
+
+        try {
+            this.showStatus('loading', '正在从 Google Drive 导入归档...');
+            const result = await window.ArchiveManager.importLatestFromDrive();
+            this.log('handleArchiveImport:success', result);
+            const summary = result.importedConversations > 0
+                ? `导入成功：${result.importedConversations} 个会话，${result.importedAssets} 个附件`
+                : (result.message || 'Google Drive 中暂无归档备份');
+            const detail = result.failures?.length
+                ? `失败 ${result.failures.length} 项：${this.formatFailures(result.failures)}`
+                : '';
+            this.showStatus(result.importedConversations > 0 ? 'success' : 'loading', detail ? `${summary}。${detail}` : summary);
+            this.showOperationToast(result.importedConversations > 0 ? 'success' : 'info', summary, detail);
+        } catch (error) {
+            this.logError('handleArchiveImport:error', error);
+            const message = this.getReadableError(error);
+            this.showStatus('error', `归档导入失败：${message}`);
+            this.showOperationToast('error', '归档导入失败', message);
+        } finally {
+            this.log('handleArchiveImport:done');
+            if (button) {
+                button.disabled = false;
+                button.innerHTML = `
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                        <path d="M12 21V9"/>
+                        <path d="M17 14l-5-5-5 5"/>
+                        <path d="M5 3h14"/>
+                    </svg>
+                    从 Google Drive 导入归档`;
+            }
         }
     }
     
@@ -572,6 +652,34 @@ class DataSyncTab extends BaseTab {
         if (statusEl) {
             statusEl.style.display = 'none';
         }
+    }
+
+    showOperationToast(type, title, detail = '') {
+        if (!window.globalToastManager) return;
+        const message = detail ? `${title}：${detail}` : title;
+        if (type === 'success') {
+            window.globalToastManager.success(message, null, { color: this.toastColors });
+            return;
+        }
+        if (type === 'info') {
+            window.globalToastManager.info(message, null, { color: this.toastColors });
+            return;
+        }
+        window.globalToastManager.error(message, null, { color: this.toastColors });
+    }
+
+    getReadableError(error) {
+        if (!error) return '未知错误';
+        if (typeof error === 'string') return error;
+        return error.message || '未知错误';
+    }
+
+    formatFailures(failures) {
+        if (!Array.isArray(failures) || failures.length === 0) return '';
+        return failures
+            .slice(0, 3)
+            .map((item) => item.message || item.rawMessage || '未知错误')
+            .join('；');
     }
     
     /**

@@ -11,7 +11,9 @@ class TimelineSettingsTab extends BaseTab {
     constructor() {
         super();
         this.id = 'timeline';
-        this.name = chrome.i18n.getMessage('pxkmvz');
+        this.name = typeof getMessageSafe === 'function'
+            ? getMessageSafe('pxkmvz', '时间轴设置')
+            : '时间轴设置';
         this.icon = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
             <circle cx="12" cy="12" r="9"/>
         </svg>`;
@@ -338,4 +340,3 @@ class TimelineSettingsTab extends BaseTab {
         super.unmounted();
     }
 }
-

@@ -255,6 +255,33 @@ function matchesCurrentPlatform(platformId) {
 }
 
 /**
+ * 检查扩展上下文是否仍然有效
+ * 页面在扩展刷新后如果没刷新，会进入 context invalidated 状态
+ * @returns {boolean}
+ */
+function isExtensionContextValid() {
+    try {
+        return !!(chrome && chrome.runtime && chrome.runtime.id);
+    } catch {
+        return false;
+    }
+}
+
+/**
+ * 安全获取 i18n 文案，扩展上下文失效时回退到 fallback
+ * @param {string} key
+ * @param {string} fallback
+ * @returns {string}
+ */
+function getMessageSafe(key, fallback = '') {
+    try {
+        return chrome.i18n.getMessage(key) || fallback;
+    } catch {
+        return fallback;
+    }
+}
+
+/**
  * 根据 URL 获取匹配的平台信息
  * @param {string} url - URL 字符串
  * @returns {Object|null} 平台信息 { id, sites, name, logoPath, features }

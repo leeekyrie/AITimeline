@@ -339,7 +339,7 @@ class TimelineManager {
                     'starred-btn',
                     'button',
                     starredBtn,
-                    chrome.i18n.getMessage('vnkxpm'),
+                    (typeof getMessageSafe === 'function' ? getMessageSafe('vnkxpm', '收藏') : '收藏'),
                     { placement: 'left' }
                 );
             });
@@ -639,7 +639,9 @@ class TimelineManager {
             starChatBtn.style.backgroundColor = 'rgba(0, 0, 0, 0.05)';
             
             const isStarred = await this.isChatStarred();
-            const tooltipText = isStarred ? chrome.i18n.getMessage('bpxjkw') : chrome.i18n.getMessage('zmvkpx');
+            const tooltipText = isStarred
+                ? (typeof getMessageSafe === 'function' ? getMessageSafe('bpxjkw', '取消收藏') : '取消收藏')
+                : (typeof getMessageSafe === 'function' ? getMessageSafe('zmvkpx', '收藏对话') : '收藏对话');
             
             window.globalTooltipManager?.show(
                 'star-chat-btn',

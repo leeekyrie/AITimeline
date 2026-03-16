@@ -25,6 +25,7 @@ class PanelModal {
         this.content = null;
         this.tabsContainer = null;
         this.closeBtn = null;
+        this.launcherBtn = null;
         
         this.tabs = new Map(); // tabId -> tab instance
         this.currentTabId = null;
@@ -141,6 +142,22 @@ class PanelModal {
         
         // 添加到 body
         document.body.appendChild(this.container);
+
+        this.createLauncher();
+    }
+
+    createLauncher() {
+        this.launcherBtn = document.createElement('button');
+        this.launcherBtn.className = 'ait-panel-launcher';
+        this.launcherBtn.type = 'button';
+        this.launcherBtn.setAttribute('aria-label', 'Open AI Timeline');
+        this.launcherBtn.innerHTML = `
+            <span class="ait-panel-launcher-badge">AI</span>
+            <span class="ait-panel-launcher-text">Timeline</span>
+        `;
+
+        document.body.appendChild(this.launcherBtn);
+        this.updateLauncherVisibility();
     }
     
     bindEvents() {
@@ -154,6 +171,14 @@ class PanelModal {
             e.stopPropagation();
             this.hide();
         });
+
+        if (this.launcherBtn) {
+            this.launcherBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                this.show('archive');
+            });
+        }
     }
     
     /**
@@ -192,6 +217,41 @@ class PanelModal {
             if (this.isVisible) {
                 this.hide();
             }
+
+            this.updateLauncherVisibility();
+        }
+    }
+
+    isSupportedSite() {
+        try {
+            if (typeof getCurrentPlatform === 'function') {
+                return !!getCurrentPlatform();
+            }
+            if (typeof SiteAdapterRegistry !== 'undefined') {
+                return !!new SiteAdapterRegistry().detectAdapter();
+            }
+            return false;
+        } catch (error) {
+            console.error('[PanelModal] Failed to detect supported site:', error);
+            return false;
+        }
+    }
+
+    updateLauncherVisibility() {
+        if (!this.launcherBtn) return;
+
+        const visible = this.isSupportedSite();
+        this.launcherBtn.classList.toggle('visible', visible);
+        this.launcherBtn.disabled = !visible;
+    }
+
+    handleInvalidatedContext(error = null) {
+        if (error) {
+            console.warn('[PanelModal] Extension context invalidated', error);
+        }
+        const message = '扩展已更新，请刷新当前页面后重试';
+        if (window.globalToastManager?.error) {
+            window.globalToastManager.error(message);
         }
     }
     
@@ -251,9 +311,24 @@ class PanelModal {
      * @param {string} tabId - 要显示的 tab ID（可选）
      */
     show(tabId = null) {
+        if (typeof isExtensionContextValid === 'function' && !isExtensionContextValid()) {
+            this.handleInvalidatedContext();
+            return;
+        }
+
+        this.updateLauncherVisibility();
+
         // ✅ 确保所有可用的 tabs 已注册（按固定顺序）
         if (typeof registerAllTabs === 'function') {
-            registerAllTabs();
+            try {
+                registerAllTabs();
+            } catch (error) {
+                if (String(error?.message || '').includes('Extension context invalidated')) {
+                    this.handleInvalidatedContext(error);
+                    return;
+                }
+                throw error;
+            }
         }
         
         // 确定要显示的 tab（带 fallback）
@@ -277,7 +352,15 @@ class PanelModal {
         }
         
         // 切换到指定 tab
-        this.switchTab(targetTabId);
+        try {
+            this.switchTab(targetTabId);
+        } catch (error) {
+            if (String(error?.message || '').includes('Extension context invalidated')) {
+                this.handleInvalidatedContext(error);
+                return;
+            }
+            throw error;
+        }
         
         // 显示面板
         this.container.classList.add('visible');
@@ -348,6 +431,7 @@ class PanelModal {
     hide() {
         this.container.classList.remove('visible');
         this.isVisible = false;
+        this.updateLauncherVisibility();
         
         // 恢复 body 滚动
         document.body.style.overflow = '';
@@ -389,6 +473,10 @@ class PanelModal {
         if (this.container && this.container.parentNode) {
             this.container.parentNode.removeChild(this.container);
         }
+
+        if (this.launcherBtn && this.launcherBtn.parentNode) {
+            this.launcherBtn.parentNode.removeChild(this.launcherBtn);
+        }
         
         // 清理引用
         this.tabs.clear();
@@ -397,6 +485,7 @@ class PanelModal {
         this.content = null;
         this.tabsContainer = null;
         this.closeBtn = null;
+        this.launcherBtn = null;
         
         console.log('[PanelModal] Destroyed');
     }
